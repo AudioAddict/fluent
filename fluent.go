@@ -21,7 +21,7 @@ type Request struct {
 	url       string
 	retry     int
 	timeout   time.Duration
-	body      io.Reader
+	body      []byte
 	res       *http.Response
 	err       error
 	backoff   *backoff.ExponentialBackOff
@@ -36,14 +36,13 @@ func (f *Request) newClient() *http.Client {
 
 func (f *Request) newRequest() (req *http.Request, err error) {
 	if f.jsonIsSet {
-		body, jsonErr := json.Marshal(f.json)
-		if jsonErr != nil {
-			return nil, jsonErr
+		f.body, err = json.Marshal(f.json)
+		if err != nil {
+			return nil, err
 		}
-		req, err = http.NewRequest(f.method, f.url, bytes.NewReader(body))
-	} else {
-		req, err = http.NewRequest(f.method, f.url, f.body)
 	}
+
+	req, err = http.NewRequest(f.method, f.url, bytes.NewReader(f.body))
 	return
 }
 
@@ -104,7 +103,9 @@ func (f *Request) Json(j interface{}) *Request {
 
 // Whatever you pass to it will be passed to http.NewRequest
 func (f *Request) Body(b io.Reader) *Request {
-	f.body = b
+	buf := new(bytes.Buffer)
+	io.Copy(buf, b)
+	f.body = buf.Bytes()
 	return f
 }
 
